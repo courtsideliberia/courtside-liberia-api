@@ -287,6 +287,66 @@ app.get("/api/leagues/:id/leaders", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ─── IMAGE ENDPOINTS ─────────────────────────────────────────────────────────
+app.get("/api/leagues/:id/logo", async (req, res) => {
+  try {
+    const doc = await db.collection("leagues").doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).send("Not found");
+    const { logoUrl } = doc.data();
+    if (!logoUrl) return res.status(404).send("No logo");
+    // logoUrl is base64 data URI like "data:image/png;base64,..."
+    if (logoUrl.startsWith("data:")) {
+      const [header, data] = logoUrl.split(",");
+      const mimeType = header.match(/data:([^;]+)/)[1];
+      const buffer = Buffer.from(data, "base64");
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "public, max-age=86400");
+      return res.send(buffer);
+    }
+    res.redirect(logoUrl);
+  } catch (e) { res.status(500).send(e.message); }
+});
+
+app.get("/api/teams/:id/logo", async (req, res) => {
+  try {
+    const doc = await db.collection("teams").doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).send("Not found");
+    const { logoUrl } = doc.data();
+    if (!logoUrl) return res.status(404).send("No logo");
+    if (logoUrl.startsWith("data:")) {
+      const [header, data] = logoUrl.split(",");
+      const mimeType = header.match(/data:([^;]+)/)[1];
+      const buffer = Buffer.from(data, "base64");
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "public, max-age=86400");
+      return res.send(buffer);
+    }
+    res.redirect(logoUrl);
+  } catch (e) { res.status(500).send(e.message); }
+});
+
+app.get("/api/players/:id/photo", async (req, res) => {
+  try {
+    const teamsSnap = await db.collection("teams").get();
+    let photoUrl = null;
+    for (const d of teamsSnap.docs) {
+      const players = d.data().players || [];
+      const player = players.find(p => p.id === req.params.id);
+      if (player) { photoUrl = player.photoUrl; break; }
+    }
+    if (!photoUrl) return res.status(404).send("No photo");
+    if (photoUrl.startsWith("data:")) {
+      const [header, data] = photoUrl.split(",");
+      const mimeType = header.match(/data:([^;]+)/)[1];
+      const buffer = Buffer.from(data, "base64");
+      res.set("Content-Type", mimeType);
+      res.set("Cache-Control", "public, max-age=86400");
+      return res.send(buffer);
+    }
+    res.redirect(photoUrl);
+  } catch (e) { res.status(500).send(e.message); }
+});
+
 // ─── SERVER ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`✅ Courtside API running on port ${PORT}`));
